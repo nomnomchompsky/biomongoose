@@ -1,0 +1,92 @@
+from optionsParse import *
+import os, rosetta, pyrosetta
+from Bio.PDB import *
+pyrosetta.init()
+
+class prepRosetta:
+    def __init__(self, options):
+        self.pdbName = options[0]
+        self.aaSeq = options[1]
+        self.dnaSeq = options[2].lower()
+        self.dimerInfo = options[3]
+        self.cDomain = options[4]
+        self.cAA = options[5]
+        self.pdbFile = '' #filename of homolog
+        self.hlInfo = '' #dna+aaseq of homolog
+        self.hlPose = ''
+        self.aaPose = ''
+        print (self.pdbFile)
+    def pdbGetter(self):
+        searcher = PDBList()
+        cwd = os.getcwd()
+        pdbFile = searcher.retrieve_pdb_file(self.pdbName, False, cwd)
+        preFix= ('pdb' + self.pdbName + '.ent')
+        os.rename(preFix, (self.pdbName + '.pdb'))
+        self.pdbFile = self.pdbName + '.pdb'
+        return 'PDB downloaded and filename fixed'
+    def hlPose(self):
+        self.hlPose = pyrosetta.pose_from_file(self.pdbFile)
+        self.hlInfo = self.hlPose.sequence()
+        dnaPos = [] #positions of the DNA, this is palindromic. the 5to3 is the first half of list
+        position = -1
+        for base in self.hlInfo:
+            position += 1
+            if ord(base) in range(97, 122):
+                dnaPos.append(position)
+        return ('Homolog Posed')
+    def aaPose(self):
+        if self.dimerInfo == 'yes':
+            self.aaPose = pyrosetta.pose_from_sequence(self.aaSeq *2, 'fa_standard')
+            self.monoOverlay()
+            return 'aaPose as Dimer'
+        else:
+            aaPose = pyrosetta.pose_from_sequence(self.aaSeq, 'fa_standard')
+            self.aaPose = (aaPose)
+            self.dimerOverlay()
+            return 'aaPose as Monomer'
+    def monoOverlay(self):
+        pass
+    def dimerOverlay(self):
+        pass
+    def hlChecker(self):
+        p = PDBParser()
+        structure = p.get_structure(self.pdbName , self.pdbFile)
+        nopeList = [' DC',' DT',' DA',' DG','HOH']
+        aaList = []
+        for model in structure:
+            for residue in model.get_residues():
+                if residue.get_resname() in nopeList:
+                    pass
+                else:
+                    aaList.append(residue.get_resname())
+        stringList = ''.join(aaList)
+        if stringList[0:int(len(stringList)/2)] == stringList[int(len(stringList)/2):len(stringList)]:
+            self.dimerInfo = 'yes'
+        else:
+            self.dimerInfo = 'no'
+        return (self.dimerInfo)
+    def scoreFind(self):
+        scorefxn = pyrosetta.get_fa_scorefxn()
+        self.hlNRG = scorefxn(self.hlPose)
+        self.aaNRG = scorefxn(self.aaPose)
+        #print 'Homolog Energy Score: %.3f ' % self.hlNRG
+        #print 'Unknown DBP Energy Score: %.3f ' % self.aaNRG
+    def PyMol(self, YN):
+        pymover = pyrosetta.PyMolMover()
+        pymover.apply(self.hlPose)
+        pymover.apply(self.aaPose)
+        if YN == 'Y':
+            pymover.send_energy(self.hlPose)
+    def compareHL(self):
+       pass
+        
+        
+myReader = readOptions('sample_Entry')
+parameters = myReader.read()
+paramPrep = prepRosetta(parameters)
+print paramPrep.pdbGetter()
+print ("Is Protein a Dimer: %s" % paramPrep.hlChecker())
+print prepRosetta.hlPose(paramPrep)
+print prepRosetta.aaPose(paramPrep)
+prepRosetta.scoreFind(paramPrep)
+prepRosetta.PyMol(paramPrep, 'Y')
