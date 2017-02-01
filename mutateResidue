@@ -1,0 +1,33 @@
+import os, rosetta, pyrosetta
+from rosetta.core import pose , chemical , scoring
+pyrosetta.init()
+
+hlPose = pyrosetta.pose_from_file('1a0a.pdb')
+aaSeq = pyrosetta.pose_from_sequence('MKRESHKHAEQARRNRLAYALHELASLIPAEWKQQNYSAAPSKATTYEAACRYIRHLQQNGSTMKRESHKHAEQARRNRLAYALHELASLIPAEWKQQNYSAAPSKATTYEAACRYIRHLQQNGST')
+check = pyrosetta.Pose()
+check.assign(hlPose)
+
+
+i = 0
+
+pymover = pyrosetta.PyMolMover()        #pymol mover
+scorefxn = pyrosetta.get_fa_scorefxn()  #full atom scoring
+
+
+
+for r in range (hlPose.total_residue()):
+    res = hlPose.residue(r+1)
+    if res.is_protein() == True:
+        aRes = aaSeq.residue(i+1)
+        if res.name1() != aRes.name1():
+            print 'Mismatch at %i, Mutating from %s to %s' % (res.seqpos() , res.name1() , aRes.name1() )
+            toMut = chemical.ResidueType(aRes.type())
+            pose.replace_pose_residue_copying_existing_coordinates(hlPose , int(res.seqpos()) , toMut)
+        i += 1
+
+pymover.apply(hlPose)
+#####################################################
+scorefxn = pyrosetta.get_fa_scorefxn()
+print 'Unknown DPB score : ' , scorefxn(hlPose)
+print 'original score : ' , scorefxn(check)
+######################################################
